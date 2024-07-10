@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 type TaskStorage struct {
@@ -30,46 +29,61 @@ func NewTaskStorage() (TaskStorage, error) {
 func CreateDB() error {
 	dbFileName := "scheduler.db"
 	dbFile := filepath.Join(".", dbFileName)
-	_, err := os.Stat(dbFile)
-
-	var install bool
-	if err != nil {
-		install = true
-	} else {
-		fmt.Println("Database already exists at:", dbFile)
-	}
 
 	dbPath := os.Getenv("TODO_DBFILE")
 	if dbPath != "" {
-		fmt.Println("Database created successfully at TODO_DBFILE:", dbPath)
 		dbFile = dbPath
-	} else if install {
-		db, err := sqlx.Connect("sqlite3", dbFile)
+		_, err := os.Stat(dbFile)
+		if err == nil {
+			fmt.Println("Database already exists at TODO_DBFILE:", dbFile)
+			return nil
+		}
+	}
+
+	_, err := os.Stat(dbFile)
+	switch {
+	case err != nil:
+		err := createDatabase(dbFile)
 		if err != nil {
 			return err
 		}
-		defer db.Close()
-
-		createTableSQL := `CREATE TABLE IF NOT EXISTS scheduler (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			date CHAR(8) NOT NULL DEFAULT "",
-			title VARCHAR(128) NOT NULL DEFAULT "",
-			comment TEXT NOT NULL DEFAULT "",
-			repeat VARCHAR(128) NOT NULL DEFAULT ""
-		);`
-
-		_, err = db.Exec(createTableSQL)
-		if err != nil {
-			return err
+		if dbPath != "" {
+			fmt.Println("Database created successfully at TODO_DBFILE:", dbFile)
+		} else {
+			fmt.Println("Database created successfully at:", dbFile)
 		}
+	default:
+		fmt.Println("Database already exists at:", dbFile)
+		return nil
+	}
 
-		createIndexSQL := `CREATE INDEX IF NOT EXISTS idx_scheduler_date ON scheduler(date);`
-		_, err = db.Exec(createIndexSQL)
-		if err != nil {
-			return err
-		}
+	return nil
+}
 
-		fmt.Println("Database created successfully at:", dbFile)
+func createDatabase(dbFile string) error {
+	db, err := sqlx.Connect("sqlite3", dbFile)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	createTableSQL := `CREATE TABLE IF NOT EXISTS scheduler (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		date CHAR(8) NOT NULL DEFAULT "",
+		title VARCHAR(128) NOT NULL DEFAULT "",
+		comment TEXT NOT NULL DEFAULT "",
+		repeat VARCHAR(128) NOT NULL DEFAULT ""
+	);`
+
+	_, err = db.Exec(createTableSQL)
+	if err != nil {
+		return err
+	}
+
+	createIndexSQL := `CREATE INDEX IF NOT EXISTS idx_scheduler_date ON scheduler(date);`
+	_, err = db.Exec(createIndexSQL)
+	if err != nil {
+		return err
 	}
 
 	return nil
