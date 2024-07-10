@@ -27,14 +27,30 @@ func main() {
 
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/nextdate", server.HandleNextDate)
+		r.Post("/signin", server.SigninHandler)
+
 		r.Route("/task", func(r chi.Router) {
-			r.Post("/", server.AddTaskHandler(storage))
-			r.Get("/", server.GetTaskHandler(storage))
-			r.Put("/", server.UpdateTaskHandler(storage))
-			r.Delete("/", server.DeleteTaskHandler(storage))
+			r.Post("/", func(w http.ResponseWriter, r *http.Request) {
+				server.Auth(server.AddTaskHandler(storage)).ServeHTTP(w, r)
+			})
+			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+				server.Auth(server.GetTaskHandler(storage)).ServeHTTP(w, r)
+			})
+			r.Put("/", func(w http.ResponseWriter, r *http.Request) {
+				server.Auth(server.UpdateTaskHandler(storage)).ServeHTTP(w, r)
+			})
+			r.Delete("/", func(w http.ResponseWriter, r *http.Request) {
+				server.Auth(server.DeleteTaskHandler(storage)).ServeHTTP(w, r)
+			})
 		})
-		r.Get("/tasks", server.GetTasksHandler(storage))
-		r.Post("/task/done", server.MarkTasksAsDoneHandler(storage))
+
+		r.Get("/tasks", func(w http.ResponseWriter, r *http.Request) {
+			server.Auth(http.HandlerFunc(server.GetTasksHandler(storage))).ServeHTTP(w, r)
+		})
+
+		r.Post("/task/done", func(w http.ResponseWriter, r *http.Request) {
+			server.Auth(http.HandlerFunc(server.MarkTasksAsDoneHandler(storage))).ServeHTTP(w, r)
+		})
 	})
 
 	port := server.GetPort()
